@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">EasyTreat</string>
+    <string name="title_activity_splash_screen">SplashScreenActivity</string>
+    <string name="splash_title">Easy Treat</string>
+    <string name="gemini_label">Gemini on board</string>
+    <string name="empty_list_label">There is no elements yet\nClick camera button to add new</string>
+    <string name="thinking_label">I\'m thinking\nPlease wait</string>
+    <string name="description_label">Description</string>
+    <string name="guidance_label">Guidance</string>
+    <string name="alternative_label">Alternative</string>
+    <string name="chat_label">Chat</string>
+    <string name="save">Save</string>
+    <string name="reload">Reload</string>
+    <string name="language">Language</string>
+    <string name="warning">Warning</string>
+    <string name="delete_message">Do you really want to delete this record?</string>
+    <string name="yes">yes</string>
+    <string name="no">no</string>
+    <string name="ok">ok</string>
+    <string name="done">Done</string>
+    <string name="record_saved">Record is saved to database</string>
+    <string name="record_already_saved">Record is already saved to database</string>
+    <string name="hint">Enter your request here</string>
+    <string name="select_language">Select language</string>
+</resources>

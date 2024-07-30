@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#65000000"
+    >
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/progressView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintDimensionRatio="1"
+        app:layout_constraintWidth_percent="0.75"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:background="@drawable/rounded_corners_blue"
+        app:layout_constraintTop_toTopOf="parent"
+        >
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/centerHorizontalGuidline"
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            app:layout_constraintGuide_percent=".5"
+            android:layout_height="wrap_content" />
+
+        <ImageView
+            android:id="@+id/geminiImageView"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintDimensionRatio="2"
+            android:src="@drawable/gemini"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintWidth_percent="0.3" />
+
+        <ImageView android:id="@+id/avatarImageView"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:src="@drawable/ai_avatar"
+            app:layout_constraintDimensionRatio="1"
+            app:layout_constraintWidth_percent="0.5"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            />
+        <ProgressBar android:id="@+id/progressBar"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintDimensionRatio="1"
+            app:layout_constraintStart_toStartOf="@id/centerHorizontalGuidline"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/avatarImageView"
+            app:layout_constraintWidth_percent="0.3"/>
+
+        <TextView android:id="@+id/thinkingTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="@dimen/text_size_lage_subtitle"
+            android:shadowDy="3"
+            android:shadowDx="2"
+            android:textStyle="bold"
+            android:layout_marginStart="20dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/progressBar"
+            app:layout_constraintTop_toTopOf="@id/progressBar"
+            app:layout_constraintBottom_toBottomOf="@id/progressBar"
+            android:text="@string/thinking_label"/>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>
