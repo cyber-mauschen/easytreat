@@ -8,17 +8,18 @@
     tools:context=".activities.MainActivity"
     android:background="#FFFFFF">
 
-    <TextView android:id="@+id/emptyListTextLabel"
-        android:layout_width="wrap_content"
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        android:textColor="#FFFFFF"
-        android:textAlignment="center"
-        android:textSize="@dimen/text_size_lage_subtitle"
-        android:text="@string/empty_list_label"
+        android:background="@color/light_blue_A200"
+        app:title="@string/app_name"
+        android:elevation="4dp"
+        android:theme="@style/ThemeOverlay.AppCompat.ActionBar"
+        app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
         />
 
     <androidx.recyclerview.widget.RecyclerView android:id="@+id/recordsListView"
@@ -31,6 +32,18 @@
         tools:itemCount="5"
         tools:listitem="@layout/record_item"
         android:dividerHeight="10dp"/>
+
+    <TextView android:id="@+id/emptyListTextLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:textAlignment="center"
+        android:textSize="@dimen/text_size_lage_subtitle"
+        android:text="@string/empty_list_label"
+        />
 
     <ImageButton android:id="@+id/cameraButton"
         android:layout_width="wrap_content"

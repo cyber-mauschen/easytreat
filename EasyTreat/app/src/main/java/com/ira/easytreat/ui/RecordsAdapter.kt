@@ -19,16 +19,21 @@ import com.ira.easytreat.database.Record
 import com.ira.easytreat.database.TreatDAO
 import com.ira.easytreat.utils.UIUtils
 
-class RecordsAdapter(private val context: Context, private val dataList: ArrayList<Record>) : RecyclerView.Adapter<RecordsAdapter.ViewHolder>() {
+interface RecordsListener {
+    fun onRecordsListUpdated(recordsList: ArrayList<Record>)
+}
+
+class RecordsAdapter(private val context: Context, private val listener: RecordsListener) : RecyclerView.Adapter<RecordsAdapter.ViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.record_item, parent, false)
-
         return ViewHolder(view)
     }
 
     override fun onBindViewHolder(viewHolder: ViewHolder, position: Int) {
+        val dao = TreatDAO(context)
+        val dataList = dao.getRecords()
         val record = dataList[position]
         viewHolder.titleTextView.text = record.name
         viewHolder.subtitleTextView.text = record.description
@@ -50,6 +55,7 @@ class RecordsAdapter(private val context: Context, private val dataList: ArrayLi
                     val dao = TreatDAO(context)
                     if (dao.deleteRecord(record) > 0) {
                         this.notifyDataSetChanged()
+                        listener.onRecordsListUpdated(dao.getRecords())
                     }
                 }
             val dialog = builder.create()
@@ -64,11 +70,12 @@ class RecordsAdapter(private val context: Context, private val dataList: ArrayLi
     }
 
     override fun getItemId(position: Int): Long {
-        val record = dataList[position]
-        return record.id.toLong()
+        return position.toLong()
     }
 
     override fun getItemCount(): Int {
+        val dao = TreatDAO(context)
+        val dataList = dao.getRecords()
         return dataList.size
     }
 

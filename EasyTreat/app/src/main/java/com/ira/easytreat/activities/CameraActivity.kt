@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.RestrictionsManager.RESULT_ERROR
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -76,32 +77,27 @@ class CameraActivity : AppCompatActivity() {
         launcher = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             try {
                 if (uri != null) {
-                    val cursor = contentResolver.query(
-                        uri,
-                        arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null
-                    )
-                    if (cursor != null && cursor.moveToFirst()) {
-                        val imageName =
-                            cursor.getString(cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME))
-                        cursor.close()
-                        // Proceed with copying the image using the retrieved filename
-                        var originUrl = copyImageToAppStorage(uri)
-                        var capturedImagePath = originUrl?.path
-                        capturedImagePath?.let {
+                    val inputStream = contentResolver.openInputStream(uri)
+                    val bitmap = BitmapFactory.decodeStream(inputStream)
+                    if (bitmap != null) {
+                        val url = saveImageToAppStorage(bitmap)
+                        val capturedImagePath = url?.path
+                        val file = File(url?.path)
+                        if (file.exists()) {
                             setResult(RESULT_OK, Intent().apply {
                                 putExtra(EXTRA_IMAGE_PATH, capturedImagePath)
                             })
+                        } else {
+                            setResult(RESULT_ERROR)
                         }
-                        finish()
-                    } else {
-                        setResult(RESULT_ERROR)
                         finish()
                     }
                 }
             } catch (exc: Exception) {
                 exc.printStackTrace()
-                finish()
             }
+            setResult(RESULT_ERROR)
+            finish()
         }
 
         imageButton.setOnClickListener {

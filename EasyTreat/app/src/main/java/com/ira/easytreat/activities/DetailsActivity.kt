@@ -2,10 +2,15 @@ package com.ira.easytreat.activities
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.graphics.PorterDuff
 import android.os.Bundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
+import android.view.View.OnTouchListener
+import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -16,34 +21,46 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.ai.client.generativeai.Chat
 import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.BlockThreshold
+import com.google.ai.client.generativeai.type.HarmCategory
+import com.google.ai.client.generativeai.type.SafetySetting
 import com.google.ai.client.generativeai.type.content
 import com.ira.easytreat.BuildConfig
 import com.ira.easytreat.R
 import com.ira.easytreat.database.Record
 import com.ira.easytreat.database.TreatDAO
+import com.ira.easytreat.utils.PreferenceManager
 import com.ira.easytreat.utils.UIUtils
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 import kotlin.random.nextInt
 
+
 class DetailsActivity : AppCompatActivity() {
     companion object {
-        const val REQUEST_RECOGNIZE_MEDICINE = "Describe the medicine in this image."
-        const val REQUEST_GET_NAME = "Tell the name only."
-        const val REQUEST_GET_SHORT_DESCRIPTION = "What is it used for?"
-        //const val REQUEST_GET_GUIDANCE = "Show instructions for use."
+        const val REQUEST_RECOGNIZE_MEDICINE = "What is medicine on the photo?"
+        const val REQUEST_GET_NAME = "Tell the name of this medicine only."
+        const val REQUEST_GET_SHORT_DESCRIPTION = "What is this medicine used for?"
         const val REQUEST_GET_ALTERNATIVE = "What are the other alternatives?"
+        const val REQUEST_GET_INGREDIENTS = "What ingredients it consists of?"
+        const val REQUEST_GET_ALERGENTS = "What allergens are in the composition?"
         const val REQUEST_TRANSLATE = "Translate to %s this text: %s"
+        const val REQUEST_TRANSLATE_TO_LANGUAGE = "Translate response to %s"
 
+        val dangerousContentSafety = SafetySetting(HarmCategory.DANGEROUS_CONTENT, BlockThreshold.NONE)
         val generativeModel = GenerativeModel(
             modelName = "gemini-1.5-flash",
+            //modelName = "gemini-1.5-pro-001",
+            //modelName = "text-embedding-004",
             // Access your API key as a Build Configuration variable (see "Set up your API key" above)
-            apiKey = BuildConfig.apiKey
+            apiKey = BuildConfig.apiKey,
+            safetySettings = listOf(dangerousContentSafety)
         )
         lateinit var chat: Chat
         var languages = arrayOf("English", "German", "French", "Hungarian", "Russian")
@@ -51,15 +68,20 @@ class DetailsActivity : AppCompatActivity() {
 
     private lateinit var toolbar: Toolbar
     private lateinit var progressView: ConstraintLayout
+    private lateinit var errorView: ConstraintLayout
     private lateinit var detailsView: ConstraintLayout
-    private lateinit var titleTextView: TextView
     private lateinit var recordImageView: ImageView
     private lateinit var descriptionTextView: TextView
-    private lateinit var descriptionLabelTextView: TextView
-    private lateinit var guidanceLabelTextView: TextView
-    private lateinit var chatLabelTextView: TextView
+    private lateinit var descriptionImageButton: ImageButton
+    private lateinit var alternativesImageButton: ImageButton
+    private lateinit var chatImageButton: ImageButton
+    private lateinit var ingredientsImageButton: ImageButton
+    private lateinit var allergensImageButton: ImageButton
+    private lateinit var selectedTabTextView: TextView
     private lateinit var chatEditText: EditText
     private lateinit var sendImageButton: ImageButton
+    private lateinit var reloadImageButton: ImageButton
+    private lateinit var errorOkButton: Button
     private lateinit var scrollView: ScrollView
     private lateinit var database: TreatDAO
     private var record: Record? = null
@@ -76,16 +98,21 @@ class DetailsActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayShowTitleEnabled(false)
         progressView = findViewById(R.id.progressView)
+        errorView = findViewById(R.id.errorView)
         detailsView = findViewById(R.id.detailsView)
-        titleTextView = findViewById(R.id.titleTextView)
         recordImageView = findViewById(R.id.recordImageView)
         descriptionTextView = findViewById(R.id.descriptionTextView)
-        descriptionLabelTextView = findViewById(R.id.descriptionLabelTextView)
-        guidanceLabelTextView = findViewById(R.id.guidanceLabelTextView)
-        chatLabelTextView = findViewById(R.id.chatLabelTextView)
+        descriptionImageButton = findViewById(R.id.descriptionLabelImageButton)
+        ingredientsImageButton = findViewById(R.id.ingredientsLabelImageButton)
+        alternativesImageButton = findViewById(R.id.alternativesLabelImageButton)
+        allergensImageButton = findViewById(R.id.allergensLabelImageButton)
+        selectedTabTextView = findViewById(R.id.selectedTabTextView)
+        chatImageButton = findViewById(R.id.chatLabelImageButton)
         chatEditText = findViewById(R.id.chatEditText)
         sendImageButton = findViewById(R.id.sendButton)
+        errorOkButton = findViewById(R.id.okButton)
         scrollView = findViewById(R.id.scrollView)
+        reloadImageButton = findViewById(R.id.reloadImageButton)
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -108,7 +135,7 @@ class DetailsActivity : AppCompatActivity() {
                 imagePath = record?.imagePath
                 val bitmap = UIUtils.getBitmapFromFilePath(imagePath!!)
                 recordImageView.setImageBitmap(bitmap)
-                titleTextView.text = record?.name
+                toolbar.title = record?.name
                 descriptionTextView.text = record?.description
 
                 bitmap?.let {
@@ -117,37 +144,139 @@ class DetailsActivity : AppCompatActivity() {
                         text(REQUEST_RECOGNIZE_MEDICINE)
                         role = "user"
                     }
-                    chat = generativeModel.startChat(history = listOf(inputContent))
+                    chat = generativeModel.startChat(history = listOf(inputContent)
+                    )
                 }
             }
         }
 
-        descriptionLabelTextView.setOnClickListener {
+        descriptionImageButton.setOnClickListener {
             this.descriptionTextView.text = record?.description
-            descriptionLabelTextView.background = getDrawable(R.drawable.selected_item)
-            guidanceLabelTextView.background = getDrawable(R.drawable.unselected_item)
-            chatLabelTextView.background = getDrawable(R.drawable.unselected_item)
+            unselectAllButtons()
+            descriptionImageButton.setColorFilter(ContextCompat.getColor(this, R.color.black), PorterDuff.Mode.SRC_IN)
+            selectedTabTextView.text = getString(R.string.description_label)
             chatEditText.visibility = View.GONE
             sendImageButton.visibility = View.GONE
+            reloadImageButton.visibility = View.VISIBLE
             selectedTab = 0
         }
-        guidanceLabelTextView.setOnClickListener({
-            this.descriptionTextView.text = record?.guidance
-            descriptionLabelTextView.background = getDrawable(R.drawable.unselected_item)
-            guidanceLabelTextView.background = getDrawable(R.drawable.selected_item)
-            chatLabelTextView.background = getDrawable(R.drawable.unselected_item)
+        ingredientsImageButton.setOnClickListener {
+            var value = ""
+            record?.ingredients?.let {
+                value = it
+            }
+            if (!value.isEmpty()) {
+                this.descriptionTextView.text = value
+            } else {
+                if (record != null) {
+                    this.descriptionTextView.text = ""
+                    progressView.visibility = View.VISIBLE
+                    lifecycleScope.launch {
+                        val ingredients = getIngredients()
+                        if (ingredients != null) {
+                            record!!.ingredients = ingredients
+                            database.updateRecord(record!!)
+                        }
+                        runOnUiThread {
+                            descriptionTextView.text = ingredients
+                            progressView.visibility = View.GONE
+                        }
+                    }
+                } else {
+                    if (imagePath != null) {
+                        recogniseMedecine(imagePath!!)
+                    }
+                }
+            }
+            unselectAllButtons()
+            ingredientsImageButton.setColorFilter(ContextCompat.getColor(this, R.color.black), PorterDuff.Mode.SRC_IN)
+            selectedTabTextView.text = getString(R.string.ingredients_label)
             chatEditText.visibility = View.GONE
             sendImageButton.visibility = View.GONE
+            reloadImageButton.visibility = View.VISIBLE
             selectedTab = 1
-        })
-        chatLabelTextView.setOnClickListener({
+        }
+        alternativesImageButton.setOnClickListener {
+            var value = ""
+            record?.alternatives?.let {
+                value = it
+            }
+            if (!value.isEmpty()) {
+                this.descriptionTextView.text = value
+            } else {
+                if (record != null) {
+                    this.descriptionTextView.text = ""
+                    progressView.visibility = View.VISIBLE
+                    lifecycleScope.launch {
+                        val alternatives = getAlternatives()
+                        if (alternatives != null) {
+                            record!!.alternatives = alternatives
+                            database.updateRecord(record!!)
+                        }
+                        runOnUiThread {
+                            descriptionTextView.text = alternatives
+                            progressView.visibility = View.GONE
+                        }
+                    }
+                } else {
+                    if (imagePath != null) {
+                        recogniseMedecine(imagePath!!)
+                    }
+                }
+            }
+            unselectAllButtons()
+            alternativesImageButton.setColorFilter(ContextCompat.getColor(this, R.color.black), PorterDuff.Mode.SRC_IN)
+            selectedTabTextView.text = getString(R.string.alternative_label)
+            chatEditText.visibility = View.GONE
+            sendImageButton.visibility = View.GONE
+            reloadImageButton.visibility = View.VISIBLE
+            selectedTab = 2
+        }
+        allergensImageButton.setOnClickListener {
+            var value = ""
+            record?.ingredients?.let {
+                value = it
+            }
+            if (!value.isEmpty()) {
+                this.descriptionTextView.text = value
+            } else {
+                if (record != null) {
+                    this.descriptionTextView.text = ""
+                    progressView.visibility = View.VISIBLE
+                    lifecycleScope.launch {
+                        val allergens = getAllergens()
+                        if (allergens != null) {
+                            record!!.alternatives = allergens
+                            database.updateRecord(record!!)
+                        }
+                        runOnUiThread {
+                            descriptionTextView.text = allergens
+                            progressView.visibility = View.GONE
+                        }
+                    }
+                } else {
+                    if (imagePath != null) {
+                        recogniseMedecine(imagePath!!)
+                    }
+                }
+            }
+            unselectAllButtons()
+            allergensImageButton.setColorFilter(ContextCompat.getColor(this, R.color.black), PorterDuff.Mode.SRC_IN)
+            selectedTabTextView.text = getString(R.string.allergens_label)
+            chatEditText.visibility = View.GONE
+            sendImageButton.visibility = View.GONE
+            reloadImageButton.visibility = View.VISIBLE
+            selectedTab = 3
+        }
+        chatImageButton.setOnClickListener({
             this.descriptionTextView.text = chatText
-            descriptionLabelTextView.background = getDrawable(R.drawable.unselected_item)
-            guidanceLabelTextView.background = getDrawable(R.drawable.unselected_item)
-            chatLabelTextView.background = getDrawable(R.drawable.selected_item)
+            unselectAllButtons()
+            chatImageButton.setColorFilter(ContextCompat.getColor(this, R.color.black), PorterDuff.Mode.SRC_IN)
+            selectedTabTextView.text = getString(R.string.chat_label)
             chatEditText.visibility = View.VISIBLE
             sendImageButton.visibility = View.VISIBLE
-            selectedTab = 2
+            reloadImageButton.visibility = View.GONE
+            selectedTab = 4
         })
 
         sendImageButton.setOnClickListener {
@@ -172,6 +301,102 @@ class DetailsActivity : AppCompatActivity() {
                 }
             }
         }
+
+        reloadImageButton.setOnClickListener {
+            if (record == null) {
+                val bitmap = UIUtils.getBitmapFromFilePath(imagePath!!)
+                if (bitmap != null) {
+                    runOnUiThread {
+                        progressView.visibility = View.VISIBLE
+                    }
+                    lifecycleScope.launch {
+                        val result = recognizeImage(bitmap)
+                        if (result != null) {
+                            val range = IntRange(0, Int.MAX_VALUE)
+                            val id = Random.nextInt(range)
+                            record = Record(
+                                id,
+                                result,
+                                imagePath!!,
+                                "",
+                                null,
+                                null,
+                                null,
+                                java.sql.Date(System.currentTimeMillis())
+                            )
+                            database.insertRecord(record!!)
+                            reloadData()
+                            runOnUiThread {
+                                // Update UI elements on the main thread using runOnUiThread
+                                progressView.visibility = View.GONE
+                                toolbar.title = result
+                                recordImageView.setImageBitmap(bitmap)
+                            }
+                        }
+                        runOnUiThread {
+                            // Update UI elements on the main thread using runOnUiThread
+                            progressView.visibility = View.GONE
+                            recordImageView.setImageBitmap(bitmap)
+                        }
+                    }
+                }
+            } else {
+                reloadData()
+            }
+        }
+        errorOkButton.setOnClickListener {
+            errorView.visibility = View.GONE
+        }
+
+        errorView.visibility = View.GONE
+        errorView.isEnabled = false
+    }
+
+    private fun reloadData() {
+        // reload data
+        runOnUiThread {
+            progressView.visibility = View.VISIBLE
+        }
+        lifecycleScope.launch {
+            var response: String? = ""
+            if (selectedTab == 0) {
+                response = getDescription()
+                if (response != null) {
+                    record!!.description = response
+                    database.updateRecord(record!!)
+                }
+            } else if (selectedTab == 1) {
+                response = getIngredients()
+                if (response != null) {
+                    record!!.ingredients = response
+                    database.updateRecord(record!!)
+                }
+            } else if (selectedTab == 2) {
+                response = getAlternatives()
+                if (response != null) {
+                    record!!.alternatives = response
+                    database.updateRecord(record!!)
+                }
+            } else if (selectedTab == 3) {
+                response = getAllergens()
+                if (response != null) {
+                    record!!.allergens = response
+                    database.updateRecord(record!!)
+                }
+            }
+            runOnUiThread {
+                descriptionTextView.text = response
+                progressView.visibility = View.GONE
+            }
+        }
+    }
+
+    private fun unselectAllButtons() {
+        descriptionImageButton.setColorFilter(ContextCompat.getColor(this, R.color.white), PorterDuff.Mode.SRC_IN)
+        ingredientsImageButton.setColorFilter(ContextCompat.getColor(this, R.color.white), PorterDuff.Mode.SRC_IN)
+        alternativesImageButton.setColorFilter(ContextCompat.getColor(this, R.color.white), PorterDuff.Mode.SRC_IN)
+        allergensImageButton.setColorFilter(ContextCompat.getColor(this, R.color.white), PorterDuff.Mode.SRC_IN)
+        chatImageButton.setColorFilter(ContextCompat.getColor(this, R.color.white), PorterDuff.Mode.SRC_IN)
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -182,44 +407,6 @@ class DetailsActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {
             finish()
-        } else if (item.itemId == R.id.action_save) {
-            if (record != null) {
-                if (database.getRecord(record!!.id) != null) {
-                    database.updateRecord(record!!)
-                    val builder = AlertDialog.Builder(this)
-                        .setTitle(getString(R.string.done))
-                        .setMessage(getString(R.string.record_saved))
-                        .setPositiveButton(getString(R.string.ok)) { dialog, which ->
-                            dialog.dismiss()
-                            finish()
-                        }
-                    val dialog = builder.create()
-                    dialog.show()
-                    return true
-                }
-                val result = database.insertRecord(record!!)
-                if (result > 0) {
-                    val builder = AlertDialog.Builder(this)
-                        .setTitle(getString(R.string.done))
-                        .setMessage(getString(R.string.record_saved))
-                        .setPositiveButton(getString(R.string.ok)) { dialog, which ->
-                            dialog.dismiss()
-                            finish()
-                        }
-                    val dialog = builder.create()
-                    dialog.show()
-                    return true
-                } else {
-                    val builder = AlertDialog.Builder(this)
-                        .setTitle(getString(R.string.warning))
-                        .setMessage(getString(R.string.record_already_saved))
-                        .setPositiveButton(getString(R.string.ok)) { dialog, which ->
-                            dialog.dismiss()
-                        }
-                    val dialog = builder.create()
-                    dialog.show()
-                }
-            }
         } else if (item.itemId == R.id.action_reload) {
             if (imagePath != null) {
                 recogniseMedecine(imagePath!!)
@@ -248,7 +435,11 @@ class DetailsActivity : AppCompatActivity() {
                         if (selectedTab == 0) {
                             record!!.description = result
                         } else if (selectedTab == 1) {
-                            record!!.guidance = result
+                            record!!.ingredients = result
+                        } else if (selectedTab == 2) {
+                            record!!.alternatives = result
+                        } else if (selectedTab == 3) {
+                            record!!.allergens = result
                         }
                         progressView.visibility = View.GONE
                     }
@@ -259,21 +450,21 @@ class DetailsActivity : AppCompatActivity() {
 
     fun recogniseMedecine(imagePath: String) {
         progressView.visibility = View.VISIBLE
-        val bitmap = UIUtils.getBitmapFromFilePath(imagePath!!)
+        val bitmap = UIUtils.getBitmapFromFilePath(imagePath)
         if (bitmap != null) {
             lifecycleScope.launch {
                 val result = recognizeImage(bitmap)
                 if (result != null) {
                     val description = getDescription()
-                    val guidance = getAlternatives()
                     if (description != null) {
                         val range = IntRange(0, Int.MAX_VALUE)
                         val id = Random.nextInt(range)
-                        record = Record(id, result, imagePath!!, description, guidance, false, false, false)
+                        record = Record(id, result, imagePath, description, null, null, null, java.sql.Date(System.currentTimeMillis()))
+                        database.insertRecord(record!!)
                         runOnUiThread {
                             // Update UI elements on the main thread using runOnUiThread
                             progressView.visibility = View.GONE
-                            titleTextView.text = result
+                            toolbar.title = result
                             descriptionTextView.text = description
                             recordImageView.setImageBitmap(bitmap)
                         }
@@ -285,31 +476,44 @@ class DetailsActivity : AppCompatActivity() {
                     recordImageView.setImageBitmap(bitmap)
                 }
             }
+        } else {
+            val context = this
+            val builder = AlertDialog.Builder(context)
+                .setTitle("Error")
+                .setMessage("Image is not available")
+                .setPositiveButton("OK") { dialog, which ->
+                    dialog.dismiss()
+                    finish()
+                }
+            val dialog = builder.create()
+            dialog.show()
         }
+    }
+
+    suspend fun requestMessage(message: String): String? {
+        //for (attempt in 1..3) {
+            try {
+                var messageToRequest = message
+                val language = PreferenceManager.getLanguage(this, "")
+                if (!language.isEmpty() && !language.equals("English")) {
+                    messageToRequest += " " + String.format(REQUEST_TRANSLATE_TO_LANGUAGE, language)
+                }
+                val response = chat.sendMessage(messageToRequest)
+                return response.text
+            } catch (exc: Exception) {
+                exc.printStackTrace()
+            }
+        //}
+        showErrorDialog("Can't recognise it. Try again.")
+        return null
     }
 
     suspend fun getDescription(): String? {
-        try {
-            val response = chat.sendMessage(REQUEST_GET_SHORT_DESCRIPTION)
-            print(response.text)
-            return response.text
-        } catch (exc: Exception) {
-            exc.printStackTrace()
-            showErrorDialog("Can't recognise it. Try again.")
-        }
-        return null
+        return requestMessage(REQUEST_GET_SHORT_DESCRIPTION)
     }
 
     suspend fun sendRequest(request: String): String? {
-        try {
-            val response = chat.sendMessage(request)
-            print(response.text)
-            return response.text
-        } catch (exc: Exception) {
-            exc.printStackTrace()
-            showErrorDialog("Can't recognise it. Try again.")
-        }
-        return null
+        return requestMessage(request)
     }
 
     suspend fun translateToLanguage(text: String, language: String): String? {
@@ -324,70 +528,37 @@ class DetailsActivity : AppCompatActivity() {
         return null
     }
 
-    /*
-    suspend fun getGuidance(): String? {
-        try {
-            val response = chat.sendMessage(REQUEST_GET_GUIDANCE)
-            print(response.text)
-            return response.text
-        } catch (exc: Exception) {
-            exc.printStackTrace()
-            showErrorDialog("Can't recognise it. Try again.")
-        }
-        return null
-    }
-    */
-
     suspend fun getAlternatives(): String? {
-        try {
-            val response = chat.sendMessage(REQUEST_GET_ALTERNATIVE)
-            print(response.text)
-            return response.text
-        } catch (exc: Exception) {
-            exc.printStackTrace()
-            showErrorDialog("Can't recognise it. Try again.")
-        }
-        return null
+        return requestMessage(REQUEST_GET_ALTERNATIVE)
+    }
+
+    suspend fun getIngredients(): String? {
+        return requestMessage(REQUEST_GET_INGREDIENTS)
+    }
+
+    suspend fun getAllergens(): String? {
+        return requestMessage(REQUEST_GET_ALERGENTS)
     }
 
     fun showErrorDialog(message: String) {
-        val context = this
-        val builder = AlertDialog.Builder(context)
-            .setTitle("Error")
-            .setMessage(message)
-            .setPositiveButton("OK") { dialog, which ->
-                dialog.dismiss()
-                //finish()
-            }
-        val dialog = builder.create()
-        dialog.show()
+        errorView.visibility = View.VISIBLE
     }
 
     suspend fun recognizeImage(bitmap: Bitmap): String? {
-        try {
-            val inputContent = content {
-                image(bitmap)
-                text(REQUEST_RECOGNIZE_MEDICINE)
-                role = "user"
-            }
-            chat = generativeModel.startChat(history = listOf(inputContent))
-            val response = chat.sendMessage(REQUEST_GET_NAME)
-
-            print(response.text)
-            return response.text
-        } catch (exc: Exception) {
-            exc.printStackTrace()
-            val message = exc.message
-            print(message)
-            when (exc.message) {
-                "Content generation stopped. Reason: SAFETY" -> {
-                    showErrorDialog("Can't recognise it. Try again: " + exc.message)
+        //for (attempt in 1..3) {
+            try {
+                val inputContent = content {
+                    image(bitmap)
+                    text(REQUEST_RECOGNIZE_MEDICINE)
+                    role = "user"
                 }
-                else -> {
-                    showErrorDialog("Can't recognise image: " + exc.message)
-                }
+                chat = generativeModel.startChat(history = listOf(inputContent))
+                return requestMessage(REQUEST_GET_NAME)
+            } catch (exc: Exception) {
+                exc.printStackTrace()
             }
-        }
+        //}
+        showErrorDialog("Can't recognise image")
         return null
     }
 }

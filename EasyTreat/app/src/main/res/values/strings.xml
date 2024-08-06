@@ -3,11 +3,15 @@
     <string name="title_activity_splash_screen">SplashScreenActivity</string>
     <string name="splash_title">Easy Treat</string>
     <string name="gemini_label">Gemini on board</string>
-    <string name="empty_list_label">There is no elements yet\nClick camera button to add new</string>
+    <string name="empty_list_label">There is no elements yet\nClick camera button to add one</string>
     <string name="thinking_label">I\'m thinking\nPlease wait</string>
+    <string name="error_label">Something went wrong.\nTry again.</string>
+    <string name="error">Error</string>
     <string name="description_label">Description</string>
     <string name="guidance_label">Guidance</string>
-    <string name="alternative_label">Alternative</string>
+    <string name="alternative_label">Alternatives</string>
+    <string name="ingredients_label">Ingredients</string>
+    <string name="allergens_label">Allergens</string>
     <string name="chat_label">Chat</string>
     <string name="save">Save</string>
     <string name="reload">Reload</string>
